@@ -10,9 +10,13 @@ import tensorkit as tk
 from config import config
 from model.unetpps import UnetppGeneratorS
 from tensorkit import logger, logging_to_file
+import math
 
 UnetGeneratorS, UnetppGenerator = None, None
 
+def psnr(x, target):
+    sqrdErr = np.mean((x - target) ** 2)
+    return 10 * math.log10(((255.0)*(255.0))/sqrdErr)
 
 class TestData(object):
 
@@ -34,13 +38,14 @@ class TestData(object):
 
     def __getitem__(self, item):
         scene = self.scenes[item]
-        ldr = ['input_{}.tif'.format(i + 1) for i in range(3)]
+        ldr = ['input_{}_aligned.tif'.format(i + 1) for i in range(3)]
         ldr = [os.path.join(scene, i) for i in ldr]
         ldr = [tk.image.read_image_np(i) for i in ldr]
         hdr_ref = ldr[0]
-        has_reference = os.path.isfile(os.path.join(scene, 'ref_hdr.hdr'))
+        hdr_tonemapped = ldr[0]
+        has_reference = os.path.isfile(os.path.join(scene, 'ref_hdr_aligned_linear.hdr'))
         if has_reference:
-            hdr_ref = hdr_utils.read_hdr(os.path.join(scene, 'ref_hdr.hdr'))
+            hdr_ref = hdr_utils.read_hdr(os.path.join(scene, 'ref_hdr_aligned_linear.hdr'))
         images = np.concatenate(ldr + [hdr_ref], axis=-1)
         images = self._center_crop(images)
         images = np.expand_dims(images, 0)
@@ -61,6 +66,7 @@ class TestData(object):
 def graph():
     ldr1, ldr2, ldr3 = [tf.placeholder(tf.float32, [None, None, None, 3]) for _ in range(3)]
     exps = tf.placeholder(tf.float32, [None, 3])
+    hdr = tf.placeholder(tf.float32, [None, None, None, 3])
     hdr1, hdr2, hdr3 = [hdr_utils.ldr2hdr(ldr, tf.reshape(exps[..., ei], [-1, 1, 1, 1]))
                         for ldr, ei in zip([ldr1, ldr2, ldr3], range(3))]
     tp1, tp2, tp3 = [hdr_utils.tonemap(hdr) for hdr in [hdr1, hdr2, hdr3]]
@@ -85,7 +91,10 @@ def graph():
         outputs_tp = [hdr_utils.tonemap(i, mu=config.MU) for i in outputs]
     else:
         outputs_tp = outputs
-    return outputs_tp, ldr1, ldr2, ldr3, exps
+    hdr_tm = hdr_utils.tonemap(hdr)
+    
+    #return outputs, outputs_tp,hdr_tm,hdr, ldr1, ldr2, ldr3, exps, 
+    return outputs_tp, ldr1, ldr2, ldr3, exps, 
 
 
 def save_result(outputs, real_hdr, file_name):
@@ -104,8 +113,10 @@ def test():
     log_dir = os.path.join(config.TEST_DIR, log_dir.strip('_'))
     logging_to_file(os.path.join(log_dir, 'log'), False)
     logger.info('CMD: {}'.format(' '.join(sys.argv)))
-
-    outputs_tp, ldr1_ph, ldr2_ph, ldr3_ph, exps_ph = graph()
+    outputslist = []
+    realhdrlist = []
+    #outputs, outputs_tp, hdr_tm, hdr, ldr1_ph, ldr2_ph, ldr3_ph, exps_ph,  = graph()
+    outputs_tp, ldr1_ph, ldr2_ph, ldr3_ph, exps_ph,  = graph()
     tic = tk.TimeTic()
 
     with tk.session(config.CUDA_VISIBLE_DEVICES) as sess:
@@ -116,16 +127,51 @@ def test():
             tic.tic(1)
             outputs = sess.run(outputs_tp, {ldr1_ph: ldr1, ldr2_ph: ldr2, ldr3_ph: ldr3,
                                             exps_ph: exps})
+            # outputs, outputs_tp, hdr_tm = sess.run(outputs, outputs_tp, hdr_tm, {hdr: real_hdr, ldr1_ph: ldr1, ldr2_ph: ldr2, ldr3_ph: ldr3,
+            #                                 exps_ph: exps})
 
             print('\r test {}/{}, tf_tic: {:.4f}'.format(ind, len(test_data), tic.tic(1)), end='')
-
+            #real_hdr = real_hdr + 2
+            # tonemapped_output1 = hdr_utils.tonemap(outputs[0])
+            # tonemapped_output2 = hdr_utils.tonemap(outputs[1])
+            outputslist.append(outputs)
+            realhdrlist.append(real_hdr)
+            # psnr1 = psnr(real_hdr, outputs_tp[0])
+            # psnr2 = psnr(real_hdr, outputs_tp[1])
+            # print("PSNR1(not u) : ", psnr1)
+            # print("PSNR2(not u) : ", psnr2)
+            
+            
             save_result(outputs, real_hdr, os.path.join(log_dir, '{:0>3d}'.format(ind)))
 
+    for i in range(len(outputslist)):
+        output1 = outputslist[i][0]
+        output2 = outputslist[i][1]
+        output1 = (output1+1.0)/2.0 * 255.
+        output2 = (output2+1.0)/2.0 * 255.
+        hdr = realhdrlist[i]
+        hdr_tm = hdr_utils.tonemap_(hdr)
+        hdr_tm = (hdr_tm+1.0)/2.0 * 255.
+        psnr1 = psnr(hdr_tm, output1)
+        psnr2 = psnr(hdr_tm, output2)
+        
+        
+        cv2.imwrite("/data2/jaep0805/HDR-GAN/results/output1.png", cv2.cvtColor(output1[0], cv2.COLOR_RGB2BGR))
+        cv2.imwrite("/data2/jaep0805/HDR-GAN/results/output2.png", cv2.cvtColor(output2[0], cv2.COLOR_RGB2BGR))
+        cv2.imwrite("/data2/jaep0805/HDR-GAN/results/hdr.png", cv2.cvtColor(hdr_tm[0], cv2.COLOR_RGB2BGR))
+        # cv2.imwrite("/data2/jaep0805/HDR-GAN/results/output1.png", cv2.cvtColor(np.swapaxes(output1[0], 0, 1), cv2.COLOR_RGB2BGR))
+        # cv2.imwrite("/data2/jaep0805/HDR-GAN/results/output2.png", cv2.cvtColor(np.swapaxes(output2[0], 0, 1), cv2.COLOR_RGB2BGR))
+        # cv2.imwrite("/data2/jaep0805/HDR-GAN/results/hdr.png", cv2.cvtColor(np.swapaxes(hdr_tm[0], 0, 1), cv2.COLOR_RGB2BGR))
+        print("PSNR1 : ", psnr1)
+        print("PSNR2 : ", psnr2)
+    print(np.mean(psnr1))
+    print(np.mean(psnr2))
 
 def args(parser):
-    parser.add_argument('--in_hdr', dest='IN_HDR', default=False, action='store_true')
-    parser.add_argument('--out_hdr', dest='OUT_HDR', default=False, action='store_true')
+    parser.add_argument('--in_hdr', dest='IN_HDR', default=True, action='store_true') #False
+    parser.add_argument('--out_hdr', dest='OUT_HDR', default=True, action='store_true') #False
     parser.add_argument('--unetpps', dest='UNETPPS', default=False, action='store_true')
     parser.add_argument('--gen', dest='GENERATOR', default='', choices=('unetpps', 'unetpp', 'unets', 'unet'))
     parser.add_argument('--mu', dest='MU', default=None, type=float)
     return parser
+

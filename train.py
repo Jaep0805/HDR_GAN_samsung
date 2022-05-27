@@ -1,6 +1,8 @@
 import argparse
 import importlib
 import os
+os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 import sys
 
 import tensorflow as tf
@@ -93,11 +95,11 @@ def train():
         .finalize_graph()
 
     tic = TimeTic()
-    saver = Saver(save_dir=log_dir, model_name='best_model', var_list=tf.global_variables(), max_to_keep=3)
+    saver = Saver(save_dir=log_dir, model_name='best_model', var_list=tf.global_variables(), max_to_keep=100000000)
     if config.ABLATION:
-        abla_saver = Saver(save_dir=log_dir, model_name='abla_model', var_list=tf.global_variables(), max_to_keep=100)
+        abla_saver = Saver(save_dir=log_dir, model_name='abla_model', var_list=tf.global_variables(), max_to_keep=100000000)
     min_vl = 1e5
-
+    val_loss = tf.zeros([1], tf.float32) #change
     def progress(sess, res, val_loss_np, step_info):
         _, loss_np = res
         print('\r {}, {}, loss: {:.6f}, tic: {:.4f}'.format(tag, step_info, loss_np, tic.tic()), end='')

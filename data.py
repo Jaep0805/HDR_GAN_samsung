@@ -12,7 +12,12 @@ from tensorkit.annotation import wrap_tf_name_scope
 def _get_exps(exps_file):
     with open(exps_file) as fr:
         exps = fr.read().split('\n')[:3]
-    return [2. ** float(i) for i in exps]
+    return [2. ** (float(i)+2.0)  for i in exps]
+
+def _get_exps_(exps_file):
+    with open(exps_file) as fr:
+        exps = fr.read().split('\n')[:3]
+    return [2. ** (float(i))  for i in exps]
 
 
 def _get_scene_data(im_fns, motion_data: bool, aug: bool, shuffle: bool, repeat: bool):
@@ -47,7 +52,7 @@ def _get_scene_data(im_fns, motion_data: bool, aug: bool, shuffle: bool, repeat:
                 images = images[x:x + h, y:y + w, :]
                 images = tk.image.zoom_image_np(images, config.train_hw[0], config.train_hw[1])
 
-            inp_exps = _get_exps(os.path.join(_scene, 'input_exp.txt'))
+            inp_exps = _get_exps_(os.path.join(_scene, 'input_exp.txt'))
             ref_exps = _get_exps(os.path.join(_scene, 'ref_exp.txt'))
             assert images.shape[-1] == 3 * images_count
             return (images.astype(np.float32), np.array(images.shape, np.int32),
@@ -98,9 +103,9 @@ def _get_train_data(motion_data: bool, aug: bool, shuffle: bool, repeat: bool, m
     :param repeat:
     :return: (ldr1, ldr2, ldr3), (ldr1r, ldr2r, ldr3r), (tp1, tp2, tp3), (tp1r, tp2r, tp3r), hdr, inp_exps, ref_exps
     """
-    im_fns = ['input_1.tif', 'input_2.tif', 'input_3.tif',
-              'ref_1.tif', 'ref_2.tif', 'ref_3.tif',
-              'ref_hdr.hdr']
+    im_fns = ['input_1_aligned.tif', 'input_2_aligned.tif', 'input_3_aligned.tif',
+              'ref_1_aligned.tif', 'ref_2_aligned.tif', 'ref_3_aligned.tif',
+              'ref_hdr_aligned_linear.hdr']
     images_count = len(im_fns)
 
     ims, inp_exps, ref_exps = _get_scene_data(im_fns, motion_data, aug, shuffle, repeat)

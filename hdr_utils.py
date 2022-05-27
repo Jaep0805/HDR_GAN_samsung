@@ -53,11 +53,18 @@ def itonemap_np(tp, mu=MU):
 
 
 def tonemap(hdr, mu=MU, name='tonemap'):  # input/output -1~1
+
     if mu is None:
         mu = MU
     with tf.name_scope(name):
+        # tf.reset_default_graph()
+        # tf.Graph().as_default()
         return tf.log(1 + mu * (hdr + 1.) / 2.) / tf.log(1 + mu) * 2. - 1
-
+    
+def tonemap_(hdr, mu=MU):  # input/output -1~1
+    if mu is None:
+        mu = MU
+    return np.log(1 + mu * (hdr + 1.) / 2.) / np.log(1 + mu) * 2. - 1
 
 def itonemap(tp, mu=MU, name='itonemap'):
     if mu is None:

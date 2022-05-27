@@ -43,14 +43,15 @@ class BackupFiles(object):
 
         for m in tuple(sys.modules.values()):
             if hasattr(m, '__file__'):
-                p = os.path.abspath(m.__file__)
-                fn = file_name(p)
-                if fn == '__init__.py':
-                    self.include_files(p, target_dir=os.path.join(*m.__name__.split('.')))
-                else:
-                    target_dir = m.__name__.split('.')[:-1]
-                    target_dir = os.path.join(*target_dir) if len(target_dir) > 0 else ''
-                    self.include_files(p, target_dir=target_dir)
+                if type(m.__file__) != type(None):
+                    p = os.path.abspath(m.__file__)
+                    fn = file_name(p)
+                    if fn == '__init__.py':
+                        self.include_files(p, target_dir=os.path.join(*m.__name__.split('.')))
+                    else:
+                        target_dir = m.__name__.split('.')[:-1]
+                        target_dir = os.path.join(*target_dir) if len(target_dir) > 0 else ''
+                        self.include_files(p, target_dir=target_dir)
 
         [self.exclude_dirs(i, recursive=True) for i in sys.path if os.path.isdir(i) and i != '' and i != '.']
 

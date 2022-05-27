@@ -243,8 +243,8 @@ def args(parser):
     parser.add_argument('--random_place', dest='random_place', default=False, action='store_true')
     parser.add_argument('--patch_ori', dest='PATCH_ORI', default=False, action='store_true')
     parser.add_argument('--mu', dest='MU', default=None, type=float)
-    parser.add_argument('--in_hdr', dest='IN_HDR', default=False, action='store_true')
-    parser.add_argument('--out_hdr', dest='OUT_HDR', default=False, action='store_true')
+    parser.add_argument('--in_hdr', dest='IN_HDR', default=True, action='store_true') #false
+    parser.add_argument('--out_hdr', dest='OUT_HDR', default=True, action='store_true') #false
     parser.add_argument('--n_loss_tp', dest='N_LOSS_TP', default=False, action='store_true')
     parser.add_argument('--unetpps', dest='UNETPPS', default=False, action='store_true')
     parser.add_argument('--gen', dest='GENERATOR', default='', choices=('unetpps', 'unetpp', 'unets', 'unet'))
